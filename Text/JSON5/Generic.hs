@@ -2,8 +2,8 @@
 -- | JSON serializer and deserializer using Data.Generics.
 -- The functions here handle algebraic data types and primitive types.
 -- It uses the same representation as "Text.JSON" for "Prelude" types.
-module Text.JSON.Generic 
-    ( module Text.JSON
+module Text.JSON5.Generic
+    ( module Text.JSON5
     , Data
     , Typeable
     , toJSON
@@ -16,8 +16,8 @@ module Text.JSON.Generic
     ) where
 
 import Control.Monad.State
-import Text.JSON
-import Text.JSON.String ( runGetJSON )
+import Text.JSON5
+import Text.JSON5.String ( runGetJSON )
 import Data.Generics
 import Data.Word
 import Data.Int

@@ -1,11 +1,11 @@
 -- | Display JSON values using pretty printing combinators.
 
-module Text.JSON.Pretty
-  ( module Text.JSON.Pretty
+module Text.JSON5.Pretty
+  ( module Text.JSON5.Pretty
   , module Text.PrettyPrint.HughesPJ
   ) where
 
-import Text.JSON.Types
+import Text.JSON5.Types
 import Text.PrettyPrint.HughesPJ
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Data.Ratio

@@ -1,7 +1,7 @@
--- | Basic support for working with JSON values.
+-- | Basic support for working with JSON5 values.
 
-module Text.JSON.String 
-     ( 
+module Text.JSON5.String
+     (
        -- * Parsing
        --
        GetJSON
@@ -30,13 +30,13 @@ module Text.JSON.String
      , showJSTopType
      ) where
 
-import Text.JSON.Types (JSValue(..),
+import Text.JSON5.Types (JSValue(..),
                         JSString, toJSString, fromJSString,
                         JSObject, toJSObject, fromJSObject)
 
 import Control.Monad (liftM, ap)
-import Control.Applicative((<$>))
-import qualified Control.Applicative as A
+-- import Control.Applicative((<$>))
+-- import qualified Control.Applicative as A
 import Data.Char (isSpace, isDigit, digitToInt)
 import Data.Ratio (numerator, denominator, (%))
 import Numeric (readHex, readDec, showHex)
@@ -45,10 +45,12 @@ import Numeric (readHex, readDec, showHex)
 -- | Parsing JSON
 
 -- | The type of JSON parsers for String
-newtype GetJSON a = GetJSON { un :: String -> Either String (a,String) }
+newtype GetJSON a = GetJSON { un :: String -> Either String (a,String{-raw string-}) }
 
-instance Functor GetJSON where fmap = liftM
-instance A.Applicative GetJSON where
+instance Functor GetJSON where
+  fmap = liftM
+
+instance Applicative GetJSON where
   pure  = return
   (<*>) = ap
 
@@ -68,11 +70,11 @@ runGetJSON (GetJSON m) s = case m s of
                         [] -> Right a
                         _  -> Left $ "Invalid tokens at end of JSON string: "++ show (take 10 t)
 
-getInput   :: GetJSON String
-getInput    = GetJSON (\s -> Right (s,s))
+getInput :: GetJSON String
+getInput = GetJSON (\s -> Right (s,s))
 
-setInput   :: String -> GetJSON ()
-setInput s  = GetJSON (\_ -> Right ((),s))
+setInput :: String -> GetJSON ()
+setInput s = GetJSON (\_ -> Right ((),s))
 
 -------------------------------------------------------------------------
 
@@ -93,7 +95,7 @@ tryJSNull k = do
   xs <- getInput
   case xs of
     'n':'u':'l':'l':xs1 -> setInput xs1 >> return JSNull
-    _ -> k 
+    _ -> k
 
 -- | Read the JSON Bool type
 readJSBool :: GetJSON JSValue
@@ -102,29 +104,38 @@ readJSBool = do
   case xs of
     't':'r':'u':'e':xs1 -> setInput xs1 >> return (JSBool True)
     'f':'a':'l':'s':'e':xs1 -> setInput xs1 >> return (JSBool False)
-    _ -> fail $ "Unable to parse JSON Bool: " ++ context xs
+    _ -> fail $ "Unable to parse JSON5 Bool: " ++ context xs
 
--- | Read the JSON String type
+
+-- | Strings
+
+-- Strings may be single quoted.
+-- Strings may span multiple lines by escaping new line characters.
+-- Strings may include character escapes.
+
+-- | Read the JSON5 String type
 readJSString :: GetJSON JSValue
 readJSString = do
   x <- getInput
   case x of
-       '"' : cs -> parse [] cs
-       _        -> fail $ "Malformed JSON: expecting string: " ++ context x
- where 
-  parse rs cs = 
+       '"'  : cs -> parse [] cs
+       '\'' : cs -> parse [] cs
+       _         -> fail $ "Malformed JSON5: expecting string: " ++ context x
+ where
+  parse rs cs =
     case cs of
-      '\\' : c : ds -> esc rs c ds
-      '"'  : ds     -> do setInput ds
-                          return (JSString (toJSString (reverse rs)))
-      c    : ds
-       | c >= '\x20' && c <= '\xff'    -> parse (c:rs) ds
+      '\\' : '\n' : ds -> parse rs ds
+      '\\' :   c  : ds -> esc rs c ds
+      c    :  ds
+       | c == '"' || c == '\'' -> do setInput ds
+                                     return (JSString (toJSString (reverse rs)))
+       | c >= '\x20' && c <= '\xff' -> parse (c:rs) ds
        | c < '\x20'     -> fail $ "Illegal unescaped character in string: " ++ context cs
        | i <= 0x10ffff  -> parse (c:rs) ds
        | otherwise -> fail $ "Illegal unescaped character in string: " ++ context cs
        where
         i = (fromIntegral (fromEnum c) :: Integer)
-      _ -> fail $ "Unable to parse JSON String: unterminated String: " ++ context cs
+      _ -> fail $ "Unable to parse JSON5 String: unterminated String: " ++ context cs
 
   esc rs c cs = case c of
    '\\' -> parse ('\\' : rs) cs
@@ -139,36 +150,45 @@ readJSString = do
              d1 : d2 : d3 : d4 : cs' ->
                case readHex [d1,d2,d3,d4] of
                  [(n,"")] -> parse (toEnum n : rs) cs'
-
                  x -> fail $ "Unable to parse JSON String: invalid hex: " ++ context (show x)
              _ -> fail $ "Unable to parse JSON String: invalid hex: " ++ context cs
-   _ ->  fail $ "Unable to parse JSON String: invalid escape char: " ++ show c
+
+   _ -> fail $ "Unable to parse JSON String: invalid escape char: " ++ show c
 
 
--- | Read an Integer or Double in JSON format, returning a Rational
+-- | Numbers
+
+-- Numbers may be hexadecimal.
+-- Numbers may have a leading or trailing decimal point.
+-- Numbers may be IEEE 754 positive infinity, negative infinity, and NaN.
+-- Numbers may begin with an explicit plus sign.
+
+-- | Read an Integer or Double in JSON5 format, returning a Rational
 readJSRational :: GetJSON Rational
 readJSRational = do
   cs <- getInput
   case cs of
     '-' : ds -> negate <$> pos ds
+    '+' : ds -> pos ds
+    '.' : _  -> pos ('0':cs)
     _        -> pos cs
 
-  where 
-   pos []     = fail $ "Unable to parse JSON Rational: " ++ context []
+  where
+   pos []     = fail $ "Unable to parse JSON5 Rational: " ++ context []
    pos (c:cs) =
      case c of
        '0' -> frac 0 cs
-       _ 
-        | not (isDigit c) -> fail $ "Unable to parse JSON Rational: " ++ context cs
-        | otherwise -> readDigits (digitToIntI c) cs
+       _
+        | isDigit c -> readDigits (digitToIntI c) cs
+        | otherwise -> fail $ "Unable to parse JSON5 Rational: " ++ context cs
 
    readDigits acc [] = frac (fromInteger acc) []
    readDigits acc (x:xs)
-    | isDigit x = let acc' = 10*acc + digitToIntI x in 
+    | isDigit x = let acc' = 10*acc + digitToIntI x in
                       acc' `seq` readDigits acc' xs
     | otherwise = frac (fromInteger acc) (x:xs)
 
-   frac n ('.' : ds) = 
+   frac n ('.' : ds) =
        case span isDigit ds of
          ([],_) -> setInput ds >> return n
          (as,bs) -> let x = read as :: Integer
@@ -320,15 +340,15 @@ showJSRational :: Rational -> ShowS
 showJSRational r = showJSRational' False r
 
 showJSRational' :: Bool -> Rational -> ShowS
-showJSRational' asFloat r 
+showJSRational' asFloat r
  | denominator r == 1      = shows $ numerator r
  | isInfinite x || isNaN x = showJSNull
  | asFloat                 = shows xf
  | otherwise               = shows x
- where 
+ where
    x :: Double
    x = realToFrac r
-   
+
    xf :: Float
    xf = realToFrac r
 

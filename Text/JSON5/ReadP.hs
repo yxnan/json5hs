@@ -1,6 +1,6 @@
 -- | Parse JSON values using the ReadP combinators.
 
-module Text.JSON.ReadP
+module Text.JSON5.ReadP
   ( p_value
   , p_null
   , p_boolean
@@ -13,7 +13,7 @@ module Text.JSON.ReadP
   , module Text.ParserCombinators.ReadP
   ) where
 
-import Text.JSON.Types
+import Text.JSON5.Types
 import Text.ParserCombinators.ReadP
 import Control.Monad
 import Data.Char
