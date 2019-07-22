@@ -12,6 +12,7 @@ module Text.JSON5.String
      , readJSBool
      , readJSString
      , readJSRational
+     , readJSInfNan{-
      , readJSArray
      , readJSObject
 
@@ -27,12 +28,12 @@ module Text.JSON5.String
      , showJSRational'
 
      , showJSValue
-     , showJSTopType
+     , showJSTopType -}
      ) where
 
-import Text.JSON5.Types (JSValue(..),
-                        JSString, toJSString, fromJSString,
-                        JSObject, toJSObject, fromJSObject)
+import Text.JSON5.Types (JSValue(..), JSNumber(..),
+                         JSString, toJSString, fromJSString,
+                         JSObject, toJSObject, fromJSObject)
 
 import Control.Monad (liftM, ap)
 -- import Control.Applicative((<$>))
@@ -45,7 +46,7 @@ import Numeric (readHex, readDec, showHex)
 -- | Parsing JSON
 
 -- | The type of JSON parsers for String
-newtype GetJSON a = GetJSON { un :: String -> Either String (a,String{-raw string-}) }
+newtype GetJSON a = GetJSON { un :: String -> Either String (a,String) }
 
 instance Functor GetJSON where
   fmap = liftM
@@ -68,7 +69,7 @@ runGetJSON (GetJSON m) s = case m s of
      Left err    -> Left err
      Right (a,t) -> case t of
                         [] -> Right a
-                        _  -> Left $ "Invalid tokens at end of JSON string: "++ show (take 10 t)
+                        _  -> Left $ "Invalid tokens at end of JSON string: "++ context t
 
 getInput :: GetJSON String
 getInput = GetJSON (\s -> Right (s,s))
@@ -88,7 +89,7 @@ readJSNull = do
   xs <- getInput
   case xs of
     'n':'u':'l':'l':xs1 -> setInput xs1 >> return JSNull
-    _ -> fail $ "Unable to parse JSON null: " ++ context xs
+    _ -> fail $ "Unable to parse JSON5 null: " ++ context xs
 
 tryJSNull :: GetJSON JSValue -> GetJSON JSValue
 tryJSNull k = do
@@ -124,9 +125,9 @@ readJSString = do
  where
   parse rs cs =
     case cs of
-      '\\' : '\n' : ds -> parse rs ds
-      '\\' :   c  : ds -> esc rs c ds
-      c    :  ds
+      '\\':'\n':ds -> parse rs ds
+      '\\':  c :ds -> esc rs c ds
+      c   : ds
        | c == '"' || c == '\'' -> do setInput ds
                                      return (JSString (toJSString (reverse rs)))
        | c >= '\x20' && c <= '\xff' -> parse (c:rs) ds
@@ -170,23 +171,29 @@ readJSRational = do
   case cs of
     '-' : ds -> negate <$> pos ds
     '+' : ds -> pos ds
-    '.' : _  -> pos ('0':cs)
+    '.' : _  -> frac 0 cs
     _        -> pos cs
 
   where
-   pos []     = fail $ "Unable to parse JSON5 Rational: " ++ context []
-   pos (c:cs) =
-     case c of
-       '0' -> frac 0 cs
-       _
-        | isDigit c -> readDigits (digitToIntI c) cs
-        | otherwise -> fail $ "Unable to parse JSON5 Rational: " ++ context cs
+   pos [] = fail $ "Unable to parse JSON5 Rational: " ++ context []
+   pos cs =
+     case cs of
+       '0':'.':ds -> frac 0 cs
+       '0':'x':ds -> hex ds
+       c  : ds
+        | isDigit c -> readDigits (digitToIntI c) ds
+        | otherwise -> fail $ "Unable to parse JSON5 Rational: " ++ context ds
 
    readDigits acc [] = frac (fromInteger acc) []
    readDigits acc (x:xs)
     | isDigit x = let acc' = 10*acc + digitToIntI x in
                       acc' `seq` readDigits acc' xs
     | otherwise = frac (fromInteger acc) (x:xs)
+
+   hex cs = case readHex cs of
+      [(a,ds)] -> do setInput ds
+                     return (fromIntegral a)
+      _        -> fail $ "Unable to parse JSON5 hexadecimal: " ++ context cs
 
    frac n ('.' : ds) =
        case span isDigit ds of
@@ -200,20 +207,35 @@ readJSRational = do
     | c == 'e' || c == 'E' = (n*) <$> exp_num cs
    exponent' n cs = setInput cs >> return n
 
-   exp_num          :: String -> GetJSON Rational
+   exp_num :: String -> GetJSON Rational
    exp_num ('+':cs)  = exp_digs cs
    exp_num ('-':cs)  = recip <$> exp_digs cs
    exp_num cs        = exp_digs cs
 
    exp_digs :: String -> GetJSON Rational
    exp_digs cs = case readDec cs of
-       [(a,ds)] -> do setInput ds
-                      return (fromIntegral ((10::Integer) ^ (a::Integer)))
-       _        -> fail $ "Unable to parse JSON exponential: " ++ context cs
+      [(a,ds)] -> do setInput ds
+                     return (fromIntegral ((10::Integer) ^ (a::Integer)))
+      _        -> fail $ "Unable to parse JSON5 exponential: " ++ context cs
 
    digitToIntI :: Char -> Integer
    digitToIntI ch = fromIntegral (digitToInt ch)
 
+readJSInfNan :: GetJSON Float
+readJSInfNan = do
+  cs <- getInput
+  case cs of
+    '-' : ds -> negate <$> pos ds
+    '+' : ds -> pos ds
+    _        -> pos cs
+
+  where
+   pos [] = fail $ "Unable to parse JSON5 InfNaN: " ++ context []
+   pos cs =
+     case cs of
+       'I':'n':'f':'i':'n':'i':'t':'y':ds -> setInput ds >> return (1 / 0)
+       'N':'a':'N':ds -> setInput ds >> return (acos 2)
+       _ -> fail $ "Unable to parse JSON5 InfNaN: " ++ context cs
 
 -- | Read a list in JSON format
 readJSArray  :: GetJSON JSValue
@@ -286,9 +308,14 @@ readJSValue = do
     '{' : _ -> readJSObject
     't' : _ -> readJSBool
     'f' : _ -> readJSBool
-    (x:_) | isDigit x || x == '-' -> JSRational False <$> readJSRational
-    xs -> tryJSNull
-             (fail $ "Malformed JSON: invalid token in this context " ++ context xs)
+    (x:xs)
+      | isDigit x || x == '.' -> JSNumber <$> JSRational False <$> readJSRational
+      | x == 'N' -> JSNumber <$> JSInfNaN <$> readJSInfNan
+      | x `elem` "+-" -> case xs of
+                            'I' : _ -> JSNumber <$> JSInfNaN <$> readJSInfNan
+                            _       -> JSNumber <$> JSRational False <$> readJSRational
+    _ -> tryJSNull
+             (fail $ "Malformed JSON: invalid token in this context " ++ context cs)
 
 -- | Top level JSON can only be Arrays or Objects
 readJSTopType :: GetJSON JSValue
@@ -298,7 +325,7 @@ readJSTopType = do
     '[' : _ -> readJSArray
     '{' : _ -> readJSObject
     _       -> fail "Invalid JSON: a JSON text a serialized object or array at the top level."
-
+{-
 -- -----------------------------------------------------------------
 -- | Writing JSON
 
@@ -403,3 +430,4 @@ encJSString jss ss = go (fromJSString jss)
       | otherwise    -> 'u' : hexxs
       where hexxs = showHex (fromEnum x) xs
 
+-}

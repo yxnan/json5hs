@@ -5,6 +5,7 @@ module Text.JSON5.Types (
 
     -- * JSON Types
     JSValue(..)
+  , JSNumber(..)
 
     -- * Wrapper Types
   , JSString(..)
@@ -23,10 +24,15 @@ import Data.String (IsString(..))
 data JSValue
     = JSNull
     | JSBool     !Bool
-    | JSRational Bool{-is Float?-} !Rational
+    | JSNumber   JSNumber
     | JSString   JSString{-wrapped-}
     | JSArray    [JSValue]
     | JSObject   (JSObject JSValue)
+    deriving (Eq, Ord, Show, Read, Typeable)
+
+data JSNumber
+    = JSRational Bool{-is Float?-} !Rational
+    | JSInfNaN   !Float
     deriving (Eq, Ord, Show, Read, Typeable)
 
 newtype JSString = JSONString { fromJSString :: String }
