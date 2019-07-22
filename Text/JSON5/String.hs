@@ -12,7 +12,7 @@ module Text.JSON5.String
      , readJSBool
      , readJSString
      , readJSRational
-     , readJSInfNan
+     , readJSInfNaN
      , readJSArray
      , readJSObject
 
@@ -20,7 +20,7 @@ module Text.JSON5.String
      , readJSTopType
 
        -- ** Writing JSON
-     , showJSNull
+     {-, showJSNull
      , showJSBool
      , showJSArray
      , showJSObject
@@ -28,7 +28,7 @@ module Text.JSON5.String
      , showJSRational'
 
      , showJSValue
-     , showJSTopType
+     , showJSTopType-}
      ) where
 
 import Text.JSON5.Types (JSValue(..),
@@ -39,7 +39,7 @@ import Text.JSON5.Types (JSValue(..),
 import Control.Monad (liftM, ap)
 -- import Control.Applicative((<$>))
 -- import qualified Control.Applicative as A
-import Data.Char (isSpace, isDigit, digitToInt)
+import Data.Char (isSpace, isDigit, isAlphaNum, digitToInt)
 import Data.Ratio (numerator, denominator, (%))
 import Numeric (readHex, readDec, showHex)
 
@@ -116,21 +116,19 @@ readJSBool = do
 -- Strings may include character escapes.
 
 -- | Read the JSON5 String type
-readJSString :: GetJSON JSValue
-readJSString = do
+readJSString :: Char -> GetJSON JSValue
+readJSString sep = do
   x <- getInput
   case x of
-       '"'  : cs -> parse [] cs
-       '\'' : cs -> parse [] cs
-       _         -> fail $ "Malformed JSON5: expecting string: " ++ context x
+       sep : cs -> parse [] cs
+       _        -> fail $ "Malformed JSON5: expecting string: " ++ context x
  where
   parse rs cs =
     case cs of
-      '\\':'\n':ds -> parse rs ds
-      '\\':  c :ds -> esc rs c ds
+      '\\': c : ds -> esc rs c ds
       c   : ds
-       | c == '"' || c == '\'' -> do setInput ds
-                                     return (JSString (toJSString (reverse rs)))
+       | c == sep -> do setInput ds
+                        return (JSString (toJSString (reverse rs)))
        | c >= '\x20' && c <= '\xff' -> parse (c:rs) ds
        | c < '\x20'     -> fail $ "Illegal unescaped character in string: " ++ context cs
        | i <= 0x10ffff  -> parse (c:rs) ds
@@ -140,8 +138,10 @@ readJSString = do
       _ -> fail $ "Unable to parse JSON5 String: unterminated String: " ++ context cs
 
   esc rs c cs = case c of
+   '\n' -> parse rs cs
    '\\' -> parse ('\\' : rs) cs
    '"'  -> parse ('"'  : rs) cs
+   '\'' -> parse ('\'' : rs) cs
    'n'  -> parse ('\n' : rs) cs
    'r'  -> parse ('\r' : rs) cs
    't'  -> parse ('\t' : rs) cs
@@ -152,10 +152,10 @@ readJSString = do
              d1 : d2 : d3 : d4 : cs' ->
                case readHex [d1,d2,d3,d4] of
                  [(n,"")] -> parse (toEnum n : rs) cs'
-                 x -> fail $ "Unable to parse JSON String: invalid hex: " ++ context (show x)
-             _ -> fail $ "Unable to parse JSON String: invalid hex: " ++ context cs
+                 x -> fail $ "Unable to parse JSON5 String: invalid hex: " ++ context (show x)
+             _ -> fail $ "Unable to parse JSON5 String: invalid hex: " ++ context cs
 
-   _ -> fail $ "Unable to parse JSON String: invalid escape char: " ++ show c
+   _ -> fail $ "Unable to parse JSON5 String: invalid escape char: " ++ show c
 
 
 -- | Numbers
@@ -198,7 +198,7 @@ readJSRational = do
 
    frac n ('.' : ds) =
        case span isDigit ds of
-         ([],_) -> setInput ds >> return n
+         ([],_)  -> setInput ds >> return n
          (as,bs) -> let x = read as :: Integer
                         y = 10 ^ (fromIntegral (length as) :: Integer)
                     in exponent' (n + (x % y)) bs
@@ -222,8 +222,9 @@ readJSRational = do
    digitToIntI :: Char -> Integer
    digitToIntI ch = fromIntegral (digitToInt ch)
 
-readJSInfNan :: GetJSON Float
-readJSInfNan = do
+-- | Read an Infinity or NaN in JSON5 format, returning a Float
+readJSInfNaN :: GetJSON Float
+readJSInfNaN = do
   cs <- getInput
   case cs of
     '-' : ds -> negate <$> pos ds
@@ -238,11 +239,11 @@ readJSInfNan = do
        'N':'a':'N':ds -> setInput ds >> return (acos 2)
        _ -> fail $ "Unable to parse JSON5 InfNaN: " ++ context cs
 
--- | Read a list in JSON format
+-- | Read a list in JSON5 format
 readJSArray  :: GetJSON JSValue
 readJSArray  = readSequence '[' ']' ',' >>= return . JSArray
 
--- | Read an object in JSON format
+-- | Read an object in JSON5 format
 readJSObject :: GetJSON JSValue
 readJSObject = readAssocs '{' '}' ',' >>= return . JSObject . toJSObject
 
@@ -256,7 +257,7 @@ readSequence start end sep = do
         case dropWhile isSpace cs of
             d : ds | d == end -> setInput (dropWhile isSpace ds) >> return []
             ds                -> setInput ds >> parse []
-    _ -> fail $ "Unable to parse JSON sequence: sequence stars with invalid character: " ++ context zs
+    _ -> fail $ "Unable to parse JSON5 sequence: sequence stars with invalid character: " ++ context zs
 
   where parse rs = rs `seq` do
           a  <- readJSValue
@@ -266,7 +267,7 @@ readSequence start end sep = do
                                     parse (a:rs)
                    | e == end -> do setInput (dropWhile isSpace es)
                                     return (reverse (a:rs))
-            _ -> fail $ "Unable to parse JSON array: unterminated array: " ++ context ds
+            _ -> fail $ "Unable to parse JSON5 array: unterminated array: " ++ context ds
 
 
 -- | Read a sequence of JSON labelled fields
@@ -277,18 +278,19 @@ readAssocs start end sep = do
     c:cs | c == start -> case dropWhile isSpace cs of
             d:ds | d == end -> setInput (dropWhile isSpace ds) >> return []
             ds              -> setInput ds >> parsePairs []
-    _ -> fail "Unable to parse JSON object: unterminated object"
+    _ -> fail "Unable to parse JSON5 object: unterminated object"
 
   where parsePairs rs = rs `seq` do
-          a  <- do k  <- do x <- readJSString ; case x of
-                                JSString s -> return (fromJSString s)
-                                _          -> fail $ "Malformed JSON field labels: object keys must be quoted strings."
+          a  <- do k  <- do x <- readJSKey
+                            case x of
+                              JSString s -> return (fromJSString s)
+                              _          -> fail ""
                    ds <- getInput
                    case dropWhile isSpace ds of
                        ':':es -> do setInput (dropWhile isSpace es)
                                     v <- readJSValue
                                     return (k,v)
-                       _      -> fail $ "Malformed JSON labelled field: " ++ context ds
+                       _      -> fail $ "Malformed JSON5 labelled field: " ++ context ds
 
           ds <- getInput
           case dropWhile isSpace ds of
@@ -296,24 +298,41 @@ readAssocs start end sep = do
                                     parsePairs (a:rs)
                    | e == end -> do setInput (dropWhile isSpace es)
                                     return (reverse (a:rs))
-            _ -> fail $ "Unable to parse JSON object: unterminated sequence: "
+            _ -> fail $ "Unable to parse JSON5 object: unterminated sequence: "
                             ++ context ds
+
+readJSKey :: GetJSON JSValue
+readJSKey = do
+  xs <- getInput
+  case xs of
+    '"'  : _ -> readJSString '"'
+    '\'' : _ -> readJSString '\''
+    _        -> readSymbol xs
+  where
+    readSymbol cs =
+      case span isSymbol cs of
+        ([],_) -> fail $ "Malformed JSON5 object key-value pairs: " ++ context cs
+        (k,ds) -> do setInput ds
+                     return (JSString (toJSString k))
+
+    isSymbol c = isAlphaNum c || c `elem` "-_"
 
 -- | Read one of several possible JS types
 readJSValue :: GetJSON JSValue
 readJSValue = do
   cs <- getInput
   case cs of
-    '"' : _ -> readJSString
+    '"' : _ -> readJSString '"'
+    '\'': _ -> readJSString '\''
     '[' : _ -> readJSArray
     '{' : _ -> readJSObject
     't' : _ -> readJSBool
     'f' : _ -> readJSBool
     (x:xs)
       | isDigit x || x == '.' -> fromJSRational <$> readJSRational
-      | x == 'N' -> fromJSInfNaN <$> readJSInfNan
+      | x `elem` "NI" -> fromJSInfNaN <$> readJSInfNaN
       | x `elem` "+-" -> case xs of
-                            'I' : _ -> fromJSInfNaN <$> readJSInfNan
+                            'I' : _ -> fromJSInfNaN <$> readJSInfNaN
                             _       -> fromJSRational <$> readJSRational
     _ -> tryJSNull
              (fail $ "Malformed JSON: invalid token in this context " ++ context cs)
@@ -326,7 +345,7 @@ readJSTopType = do
     '[' : _ -> readJSArray
     '{' : _ -> readJSObject
     _       -> fail "Invalid JSON: a JSON text a serialized object or array at the top level."
-
+{-
 -- -----------------------------------------------------------------
 -- | Writing JSON
 
@@ -430,3 +449,4 @@ encJSString jss ss = go (fromJSString jss)
       | x < '\x1000' -> 'u' : '0' : hexxs
       | otherwise    -> 'u' : hexxs
       where hexxs = showHex (fromEnum x) xs
+-}
