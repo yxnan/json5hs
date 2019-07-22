@@ -12,7 +12,7 @@ module Text.JSON5.String
      , readJSBool
      , readJSString
      , readJSRational
-     , readJSInfNan{-
+     , readJSInfNan
      , readJSArray
      , readJSObject
 
@@ -28,10 +28,11 @@ module Text.JSON5.String
      , showJSRational'
 
      , showJSValue
-     , showJSTopType -}
+     , showJSTopType
      ) where
 
-import Text.JSON5.Types (JSValue(..), JSNumber(..),
+import Text.JSON5.Types (JSValue(..),
+                         JSNumber, fromJSInfNaN, fromJSRational,
                          JSString, toJSString, fromJSString,
                          JSObject, toJSObject, fromJSObject)
 
@@ -182,7 +183,7 @@ readJSRational = do
        '0':'x':ds -> hex ds
        c  : ds
         | isDigit c -> readDigits (digitToIntI c) ds
-        | otherwise -> fail $ "Unable to parse JSON5 Rational: " ++ context ds
+        | otherwise -> fail $ "Unable to parse JSON5 Rational: " ++ context cs
 
    readDigits acc [] = frac (fromInteger acc) []
    readDigits acc (x:xs)
@@ -309,11 +310,11 @@ readJSValue = do
     't' : _ -> readJSBool
     'f' : _ -> readJSBool
     (x:xs)
-      | isDigit x || x == '.' -> JSNumber <$> JSRational False <$> readJSRational
-      | x == 'N' -> JSNumber <$> JSInfNaN <$> readJSInfNan
+      | isDigit x || x == '.' -> fromJSRational <$> readJSRational
+      | x == 'N' -> fromJSInfNaN <$> readJSInfNan
       | x `elem` "+-" -> case xs of
-                            'I' : _ -> JSNumber <$> JSInfNaN <$> readJSInfNan
-                            _       -> JSNumber <$> JSRational False <$> readJSRational
+                            'I' : _ -> fromJSInfNaN <$> readJSInfNan
+                            _       -> fromJSRational <$> readJSRational
     _ -> tryJSNull
              (fail $ "Malformed JSON: invalid token in this context " ++ context cs)
 
@@ -325,7 +326,7 @@ readJSTopType = do
     '[' : _ -> readJSArray
     '{' : _ -> readJSObject
     _       -> fail "Invalid JSON: a JSON text a serialized object or array at the top level."
-{-
+
 -- -----------------------------------------------------------------
 -- | Writing JSON
 
@@ -429,5 +430,3 @@ encJSString jss ss = go (fromJSString jss)
       | x < '\x1000' -> 'u' : '0' : hexxs
       | otherwise    -> 'u' : hexxs
       where hexxs = showHex (fromEnum x) xs
-
--}

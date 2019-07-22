@@ -6,6 +6,8 @@ module Text.JSON5.Types (
     -- * JSON Types
     JSValue(..)
   , JSNumber(..)
+  , fromJSRational
+  , fromJSInfNaN
 
     -- * Wrapper Types
   , JSString(..)
@@ -34,6 +36,12 @@ data JSNumber
     = JSRational Bool{-is Float?-} !Rational
     | JSInfNaN   !Float
     deriving (Eq, Ord, Show, Read, Typeable)
+
+fromJSRational :: Rational -> JSValue
+fromJSRational = JSNumber . JSRational False
+
+fromJSInfNaN :: Float -> JSValue
+fromJSInfNaN = JSNumber . JSInfNaN
 
 newtype JSString = JSONString { fromJSString :: String }
     deriving (Eq, Ord, Show, Read, Typeable)
