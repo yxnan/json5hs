@@ -3,7 +3,6 @@
 module Text.JSON5.String
      (
        -- * Parsing
-       --
        GetJSON
      , runGetJSON
 
@@ -20,19 +19,18 @@ module Text.JSON5.String
      , readJSTopType
 
        -- ** Writing JSON
-     {-, showJSNull
+     , showJSNull
      , showJSBool
      , showJSArray
      , showJSObject
      , showJSRational
-     , showJSRational'
 
      , showJSValue
-     , showJSTopType-}
+     , showJSTopType
      ) where
 
 import Text.JSON5.Types (JSValue(..),
-                         JSNumber, fromJSInfNaN, fromJSRational,
+                         JSNumber(..), fromJSInfNaN, fromJSRational,
                          JSString, toJSString, fromJSString,
                          JSObject, toJSObject, fromJSObject)
 
@@ -70,7 +68,7 @@ runGetJSON (GetJSON m) s = case m s of
      Left err    -> Left err
      Right (a,t) -> case t of
                         [] -> Right a
-                        _  -> Left $ "Invalid tokens at end of JSON string: "++ context t
+                        _  -> Left $ "Invalid tokens at end of JSON5 string: "++ context t
 
 getInput :: GetJSON String
 getInput = GetJSON (\s -> Right (s,s))
@@ -339,7 +337,7 @@ readJSValue = do
                             'I' : _ -> fromJSInfNaN <$> readJSInfNaN
                             _       -> fromJSRational <$> readJSRational
     _ -> tryJSNull
-             (fail $ "Malformed JSON: invalid token in this context " ++ context cs)
+             (fail $ "Malformed JSON5: invalid token in this context " ++ context cs)
 
 -- | Top level JSON can only be Arrays or Objects
 readJSTopType :: GetJSON JSValue
@@ -348,109 +346,107 @@ readJSTopType = do
   case cs of
     '[' : _ -> readJSArray
     '{' : _ -> readJSObject
-    _       -> fail "Invalid JSON: a JSON text a serialized object or array at the top level."
-{-
--- -----------------------------------------------------------------
--- | Writing JSON
+    _       -> fail "Invalid JSON5: expecting a serialized object or array at the top level."
 
--- | Show strict JSON top level types. Values not permitted
+-- -----------------------------------------------------------------
+-- | Writing JSON5
+
+-- | Show strict JSON5 top level types. Values not permitted
 -- at the top level are wrapped in a singleton array.
 showJSTopType :: JSValue -> ShowS
 showJSTopType (JSArray a)    = showJSArray a
 showJSTopType (JSObject o)   = showJSObject o
 showJSTopType x              = showJSTopType $ JSArray [x]
 
--- | Show JSON values
+-- | Show JSON5 values
 showJSValue :: JSValue -> ShowS
-showJSValue jv =
-  case jv of
+showJSValue v =
+  case v of
     JSNull{}         -> showJSNull
     JSBool b         -> showJSBool b
-    JSRational asF r -> showJSRational' asF r
+    JSNumber jsn     -> showJSNumber jsn
     JSArray a        -> showJSArray a
     JSString s       -> showJSString s
     JSObject o       -> showJSObject o
 
--- | Write the JSON null type
+-- | Write the JSON5 null type
 showJSNull :: ShowS
 showJSNull = showString "null"
 
--- | Write the JSON Bool type
+-- | Write the JSON5 Bool type
 showJSBool :: Bool -> ShowS
 showJSBool True  = showString "true"
 showJSBool False = showString "false"
 
--- | Write the JSON String type
+-- | Write the JSON5 String type
 showJSString :: JSString -> ShowS
 showJSString x xs = quote (encJSString x (quote xs))
   where
-        quote = showChar '"'
+      quote = showChar '"'
 
--- | Show a Rational in JSON format
+showJSNumber :: JSNumber -> ShowS
+showJSNumber (JSRational r) = showJSRational r
+showJSNumber (JSInfNaN n)   = showJSInfNaN n
+
+-- | Show a Rational in JSON5 format
 showJSRational :: Rational -> ShowS
-showJSRational r = showJSRational' False r
+showJSRational r
+ | denominator r == 1   = shows $ numerator r
+ | otherwise            = shows $ realToFrac r
 
-showJSRational' :: Bool -> Rational -> ShowS
-showJSRational' asFloat r
- | denominator r == 1      = shows $ numerator r
- | isInfinite x || isNaN x = showJSNull
- | asFloat                 = shows xf
- | otherwise               = shows x
- where
-   x :: Double
-   x = realToFrac r
-
-   xf :: Float
-   xf = realToFrac r
+-- | Show a Infinity or NaN in JSON5 format
+showJSInfNaN :: Float -> ShowS
+showJSInfNaN n
+  | isNaN n     = showString "NaN"
+  | n > 0       = showString "Infinity"
+  | n < 0       = showString "-Infinity"
 
 
-
--- | Show a list in JSON format
+-- | Show a list in JSON5 format
 showJSArray :: [JSValue] -> ShowS
 showJSArray = showSequence '[' ']' ','
 
--- | Show an association list in JSON format
+-- | Show an association list in JSON5 format
 showJSObject :: JSObject JSValue -> ShowS
 showJSObject = showAssocs '{' '}' ',' . fromJSObject
 
--- | Show a generic sequence of pairs in JSON format
+-- | Show a generic sequence of pairs in JSON5 format
 showAssocs :: Char -> Char -> Char -> [(String,JSValue)] -> ShowS
 showAssocs start end sep xs rest = start : go xs
   where
-  go [(k,v)]     = '"' : encJSString (toJSString k)
-                            ('"' : ':' : showJSValue v (go []))
-  go ((k,v):kvs) = '"' : encJSString (toJSString k)
-                            ('"' : ':' : showJSValue v (sep : go kvs))
-  go []          = end : rest
+    go [(k,v)]     = '"' : encJSString (toJSString k)
+                              ('"' : ':' : showJSValue v (go []))
+    go ((k,v):kvs) = '"' : encJSString (toJSString k)
+                              ('"' : ':' : showJSValue v (sep : go kvs))
+    go []          = end : rest
 
--- | Show a generic sequence in JSON format
+-- | Show a generic sequence in JSON5 format
 showSequence :: Char -> Char -> Char -> [JSValue] -> ShowS
 showSequence start end sep xs rest = start : go xs
   where
-  go [y]        = showJSValue y (go [])
-  go (y:ys)     = showJSValue y (sep : go ys)
-  go []         = end : rest
+    go [y]        = showJSValue y (go [])
+    go (y:ys)     = showJSValue y (sep : go ys)
+    go []         = end : rest
 
 encJSString :: JSString -> ShowS
 encJSString jss ss = go (fromJSString jss)
   where
-  go s1 =
-    case s1 of
-      (x   :xs) | x < '\x20' -> '\\' : encControl x (go xs)
-      ('"' :xs)              -> '\\' : '"'  : go xs
-      ('\\':xs)              -> '\\' : '\\' : go xs
-      (x   :xs)              -> x    : go xs
-      ""                     -> ss
+    go s1 =
+      case s1 of
+        (x   :xs) | x < '\x20' -> '\\' : encControl x (go xs)
+        ('"' :xs)              -> '\\' : '"'  : go xs
+        ('\\':xs)              -> '\\' : '\\' : go xs
+        (x   :xs)              -> x    : go xs
+        ""                     -> ss
 
-  encControl x xs = case x of
-    '\b' -> 'b' : xs
-    '\f' -> 'f' : xs
-    '\n' -> 'n' : xs
-    '\r' -> 'r' : xs
-    '\t' -> 't' : xs
-    _ | x < '\x10'   -> 'u' : '0' : '0' : '0' : hexxs
-      | x < '\x100'  -> 'u' : '0' : '0' : hexxs
-      | x < '\x1000' -> 'u' : '0' : hexxs
-      | otherwise    -> 'u' : hexxs
-      where hexxs = showHex (fromEnum x) xs
--}
+    encControl x xs = case x of
+      '\b' -> 'b' : xs
+      '\f' -> 'f' : xs
+      '\n' -> 'n' : xs
+      '\r' -> 'r' : xs
+      '\t' -> 't' : xs
+      _ | x < '\x10'   -> 'u' : '0' : '0' : '0' : hexxs
+        | x < '\x100'  -> 'u' : '0' : '0' : hexxs
+        | x < '\x1000' -> 'u' : '0' : hexxs
+        | otherwise    -> 'u' : hexxs
+        where hexxs = showHex (fromEnum x) xs

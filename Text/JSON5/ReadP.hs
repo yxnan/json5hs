@@ -23,12 +23,12 @@ token            :: ReadP a -> ReadP a
 token p           = skipSpaces **> p
 
 p_value          :: ReadP JSValue
-p_value           =  (JSNull      <$$  p_null)
+p_value           =   (JSNull      <$$  p_null)
                  <||> (JSBool      <$$> p_boolean)
                  <||> (JSArray     <$$> p_array)
                  <||> (JSString    <$$> p_js_string)
                  <||> (JSObject    <$$> p_js_object)
-                 <||> (JSRational False <$$> p_number)
+                 -- <||> (JSNumber    <$$> p_number)
 
 p_null           :: ReadP ()
 p_null            = token (string "null") >> return ()

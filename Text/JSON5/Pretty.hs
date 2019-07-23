@@ -1,43 +1,66 @@
 -- | Display JSON values using pretty printing combinators.
 
 module Text.JSON5.Pretty
-  ( module Text.JSON5.Pretty
-  , module Text.PrettyPrint.HughesPJ
+  ( ppJSValue
+
+  , ppNull
+  , ppBoolean
+
+  , ppJSNumber
+  , ppRational
+  , ppInfNaN
+
+  , ppArray
+  , ppString
+  , ppObject
+  , ppJSString
+  , ppJSObject
   ) where
 
 import Text.JSON5.Types
+import Text.JSON5.String {-debug-}
 import Text.PrettyPrint.HughesPJ
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Data.Ratio
 import Data.Char
 import Numeric
 
-pp_value         :: JSValue -> Doc
-pp_value v        = case v of
-    JSNull       -> pp_null
-    JSBool x     -> pp_boolean x
-    JSRational asf x -> pp_number asf x
-    JSString x   -> pp_js_string x
-    JSArray vs   -> pp_array vs
-    JSObject xs  -> pp_js_object xs
+ppJSValue        :: JSValue -> Doc
+ppJSValue v       = case v of
+    JSNull       -> ppNull
+    JSBool x     -> ppBoolean x
+    JSNumber jsn -> ppJSNumber jsn
+    JSString x   -> ppJSString x
+    JSArray vs   -> ppArray vs
+    JSObject xs  -> ppJSObject xs
 
-pp_null          :: Doc
-pp_null           = text "null"
+ppNull :: Doc
+ppNull = text "null"
 
-pp_boolean       :: Bool -> Doc
-pp_boolean True   = text "true"
-pp_boolean False  = text "false"
+ppBoolean :: Bool -> Doc
+ppBoolean True  = text "true"
+ppBoolean False = text "false"
 
-pp_number        :: Bool -> Rational -> Doc
-pp_number _ x | denominator x == 1 = integer (numerator x)
-pp_number True x                   = float (fromRational x)
-pp_number _    x                   = double (fromRational x)
+ppJSNumber :: JSNumber -> Doc
+ppJSNumber (JSRational r) = ppRational r
+ppJSNumber (JSInfNaN n)   = ppInfNaN n
 
-pp_array         :: [JSValue] -> Doc
-pp_array xs       = brackets $ fsep $ punctuate comma $ map pp_value xs
+ppRational :: Rational -> Doc
+ppRational x
+  | denominator x == 1 = integer (numerator x)
+  | otherwise          = double (fromRational x)
 
-pp_string        :: String -> Doc
-pp_string x       = doubleQuotes $ hcat $ map pp_char x
+ppInfNaN :: Float -> Doc
+ppInfNaN n
+  | isNaN n = text "NaN"
+  | n > 0   = text "Infinity"
+  | n < 0   = text "-Infinity"
+
+ppArray :: [JSValue] -> Doc
+ppArray xs = brackets $ fsep $ punctuate comma $ map ppJSValue xs
+
+ppString :: String -> Doc
+ppString x = doubleQuotes $ hcat $ map pp_char x
   where pp_char '\\'            = text "\\\\"
         pp_char '"'             = text "\\\""
         pp_char c | isControl c = uni_esc c
@@ -49,13 +72,12 @@ pp_string x       = doubleQuotes $ hcat $ map pp_char x
                   | otherwise = cs
           where len = length cs
 
-pp_object        :: [(String,JSValue)] -> Doc
-pp_object xs      = braces $ fsep $ punctuate comma $ map pp_field xs
-  where pp_field (k,v) = pp_string k PP.<> colon <+> pp_value v
+ppObject :: [(String,JSValue)] -> Doc
+ppObject xs = braces $ fsep $ punctuate comma $ map pp_field xs
+  where pp_field (k,v) = ppString k PP.<> colon <+> ppJSValue v
 
-pp_js_string     :: JSString -> Doc
-pp_js_string x    = pp_string (fromJSString x)
+ppJSString :: JSString -> Doc
+ppJSString x = ppString (fromJSString x)
 
-pp_js_object     :: JSObject JSValue -> Doc
-pp_js_object x    = pp_object (fromJSObject x)
-
+ppJSObject :: JSObject JSValue -> Doc
+ppJSObject x = ppObject (fromJSObject x)

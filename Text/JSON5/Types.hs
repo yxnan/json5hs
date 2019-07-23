@@ -33,12 +33,12 @@ data JSValue
     deriving (Eq, Ord, Show, Read, Typeable)
 
 data JSNumber
-    = JSRational Bool{-is Float?-} !Rational
+    = JSRational !Rational
     | JSInfNaN   !Float
     deriving (Eq, Ord, Show, Read, Typeable)
 
 fromJSRational :: Rational -> JSValue
-fromJSRational = JSNumber . JSRational False
+fromJSRational = JSNumber . JSRational
 
 fromJSInfNaN :: Float -> JSValue
 fromJSInfNaN = JSNumber . JSInfNaN
