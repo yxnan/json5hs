@@ -39,7 +39,7 @@ import Text.JSON5.Types (JSValue(..),
 import Control.Monad (liftM, ap)
 -- import Control.Applicative((<$>))
 -- import qualified Control.Applicative as A
-import Data.Char (isSpace, isDigit, isAlphaNum, digitToInt)
+import Data.Char (isSpace, isDigit, isAlpha, isAlphaNum, digitToInt)
 import Data.Ratio (numerator, denominator, (%))
 import Numeric (readHex, readDec, showHex)
 
@@ -220,7 +220,7 @@ readJSRational = do
       _        -> fail $ "Unable to parse JSON5 exponential: " ++ context cs
 
    digitToIntI :: Char -> Integer
-   digitToIntI ch = fromIntegral (digitToInt ch)
+   digitToIntI = fromIntegral . digitToInt
 
 -- | Read an Infinity or NaN in JSON5 format, returning a Float
 readJSInfNaN :: GetJSON Float
@@ -303,18 +303,22 @@ readAssocs start end sep = do
 
 readJSKey :: GetJSON JSValue
 readJSKey = do
-  xs <- getInput
-  case xs of
+  zs <- getInput
+  case zs of
     '"'  : _ -> readJSString '"'
     '\'' : _ -> readJSString '\''
-    _        -> readSymbol xs
+    _        -> readSymbol zs
   where
-    readSymbol cs =
-      case span isSymbol cs of
-        ([],_) -> fail $ "Malformed JSON5 object key-value pairs: " ++ context cs
-        (k,ds) -> do setInput ds
-                     return (JSString (toJSString k))
+    readSymbol [] = fail $ "Malformed JSON5 object key-value pairs: " ++ context []
+    readSymbol xs@(c:cs)
+      | isStart c = case span isSymbol xs of
+              ([],_) -> fail $ "Malformed JSON5 object key-value pairs: " ++ context cs
+              (k,ds) -> do setInput ds
+                           return (JSString (toJSString k))
 
+      | otherwise = fail $ "Malformed JSON5 object key: started with illegal character: " ++ context xs
+
+    isStart  c = isAlpha c    || c `elem` "_$"
     isSymbol c = isAlphaNum c || c `elem` "-_"
 
 -- | Read one of several possible JS types
