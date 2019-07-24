@@ -3,7 +3,7 @@
 
 module Text.JSON5.Types (
 
-    -- * JSON Types
+    -- * JSON5 Types
     JSValue(..)
   , JSNumber(..)
   , fromJSRational

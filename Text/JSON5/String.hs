@@ -6,7 +6,7 @@ module Text.JSON5.String
        GetJSON
      , runGetJSON
 
-       -- ** Reading JSON
+       -- ** Reading JSON5
      , readJSNull
      , readJSBool
      , readJSString
@@ -18,7 +18,7 @@ module Text.JSON5.String
      , readJSValue
      , readJSTopType
 
-       -- ** Writing JSON
+       -- ** Writing JSON5
      , showJSNull
      , showJSBool
      , showJSArray
@@ -36,22 +36,22 @@ import Text.JSON5.Types (JSValue(..),
                          JSObject, toJSObject, fromJSObject)
 
 import Control.Monad (liftM, ap)
--- import Control.Applicative((<$>))
--- import qualified Control.Applicative as A
+import Control.Applicative((<$>))
+import qualified Control.Applicative as A
 import Data.Char (isSpace, isDigit, isAlpha, isAlphaNum, digitToInt)
 import Data.Ratio (numerator, denominator, (%))
 import Numeric (readHex, readDec, showHex)
 
 -- -----------------------------------------------------------------
--- | Parsing JSON
+-- | Parsing JSON5
 
--- | The type of JSON parsers for String
+-- | The type of JSON5 parsers for String
 newtype GetJSON a = GetJSON { un :: String -> Either String (a,String) }
 
 instance Functor GetJSON where
   fmap = liftM
 
-instance Applicative GetJSON where
+instance A.Applicative GetJSON where
   pure  = return
   (<*>) = ap
 
@@ -62,7 +62,7 @@ instance Monad GetJSON where
                                      Left err -> Left err
                                      Right (a,s1) -> un (f a) s1)
 
--- | Run a JSON reader on an input String, returning some Haskell value.
+-- | Run a JSON5 reader on an input String, returning some Haskell value.
 -- All input will be consumed.
 runGetJSON :: GetJSON a -> String -> Either String a
 runGetJSON (GetJSON m) s = case m s of
@@ -83,7 +83,7 @@ setInput s = GetJSON (\_ -> Right ((),s))
 context :: String -> String
 context s = take 8 s
 
--- | Read the JSON null type
+-- | Read the JSON5 null type
 readJSNull :: GetJSON JSValue
 readJSNull = do
   xs <- getInput
@@ -98,7 +98,7 @@ tryJSNull k = do
     'n':'u':'l':'l':xs1 -> setInput xs1 >> return JSNull
     _ -> k
 
--- | Read the JSON Bool type
+-- | Read the JSON5 Bool type
 readJSBool :: GetJSON JSValue
 readJSBool = do
   xs <- getInput
@@ -258,18 +258,21 @@ readSequence start end sep = do
             ds                -> setInput ds >> parse []
     _ -> fail $ "Unable to parse JSON5 sequence: sequence stars with invalid character: " ++ context zs
 
-  where parse rs = rs `seq` do
-          a  <- readJSValue
-          ds <- getInput
-          case dropWhile isSpace ds of
-            e : es | e == sep -> do setInput (dropWhile isSpace es)
-                                    parse (a:rs)
-                   | e == end -> do setInput (dropWhile isSpace es)
-                                    return (reverse (a:rs))
-            _ -> fail $ "Unable to parse JSON5 array: unterminated array: " ++ context ds
+  where
+    parse rs = rs `seq` do
+        a  <- readJSValue
+        ds <- getInput
+        case dropWhile isSpace ds of
+          e : es
+            | e == sep -> case dropWhile isSpace es of
+                            ']':cs -> setInput cs >> return (reverse (a:rs))
+                            cs     -> setInput cs >> parse (a:rs)
+            | e == end -> do setInput (dropWhile isSpace es)
+                             return (reverse (a:rs))
+          _ -> fail $ "Unable to parse JSON5 array: unterminated array: " ++ context ds
 
 
--- | Read a sequence of JSON labelled fields
+-- | Read a sequence of JSON5 labelled fields
 readAssocs :: Char -> Char -> Char -> GetJSON [(String,JSValue)]
 readAssocs start end sep = do
   zs <- getInput
@@ -341,7 +344,7 @@ readJSValue = do
     _ -> tryJSNull
              (fail $ "Malformed JSON5: invalid token in this context " ++ context cs)
 
--- | Top level JSON can only be Arrays or Objects
+-- | Top level JSON5 can only be Arrays or Objects
 readJSTopType :: GetJSON JSValue
 readJSTopType = do
   cs <- getInput
@@ -404,15 +407,15 @@ showJSInfNaN n
   | n < 0       = showString "-Infinity"
 
 
--- | Show a list in JSON5 format
+-- | Show a list in JSON format
 showJSArray :: [JSValue] -> ShowS
 showJSArray = showSequence '[' ']' ','
 
--- | Show an association list in JSON5 format
+-- | Show an association list in JSON format
 showJSObject :: JSObject JSValue -> ShowS
 showJSObject = showAssocs '{' '}' ',' . fromJSObject
 
--- | Show a generic sequence of pairs in JSON5 format
+-- | Show a generic sequence of pairs in JSON format
 showAssocs :: Char -> Char -> Char -> [(String,JSValue)] -> ShowS
 showAssocs start end sep xs rest = start : go xs
   where
@@ -422,7 +425,7 @@ showAssocs start end sep xs rest = start : go xs
                               ('"' : ':' : showJSValue v (sep : go kvs))
     go []          = end : rest
 
--- | Show a generic sequence in JSON5 format
+-- | Show a generic sequence in JSON format
 showSequence :: Char -> Char -> Char -> [JSValue] -> ShowS
 showSequence start end sep xs rest = start : go xs
   where

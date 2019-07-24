@@ -3,8 +3,7 @@
 -- The functions here handle algebraic data types and primitive types.
 -- It uses the same representation as "Text.JSON5" for "Prelude" types.
 module Text.JSON5.Generic
-    ( module Text.JSON5
-    , Data
+    ( Data
     , Typeable
     , toJSON
     , fromJSON
@@ -19,7 +18,6 @@ import Control.Monad.State
 import Text.JSON5.Types
 import Text.JSON5 (JSON5(..), Result(..))
 import Text.JSON5.String (runGetJSON, readJSValue, showJSValue)
-import Text.JSON5.Pretty
 import Data.Generics
 import Data.Word
 import Data.Int

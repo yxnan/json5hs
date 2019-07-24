@@ -1,4 +1,4 @@
--- | Display JSON values using pretty printing combinators.
+-- | Display JSON5 values using pretty printing combinators.
 
 module Text.JSON5.Pretty
   ( ppJSValue
