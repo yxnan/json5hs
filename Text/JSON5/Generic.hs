@@ -1,5 +1,5 @@
 {-# LANGUAGE PatternGuards #-}
--- | JSON serializer and deserializer using Data.Generics.
+-- | JSON5 serializer and deserializer using Data.Generics.
 -- The functions here handle algebraic data types and primitive types.
 -- It uses the same representation as "Text.JSON5" for "Prelude" types.
 module Text.JSON5.Generic
@@ -17,8 +17,9 @@ module Text.JSON5.Generic
 
 import Control.Monad.State
 import Text.JSON5.Types
-import Text.JSON5 (JSON(..), Result(..))
+import Text.JSON5 (JSON5(..), Result(..))
 import Text.JSON5.String (runGetJSON, readJSValue, showJSValue)
+import Text.JSON5.Pretty
 import Data.Generics
 import Data.Word
 import Data.Int
@@ -26,12 +27,12 @@ import Data.Int
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.IntSet as I
--- FIXME: The JSON library treats this specially, needs ext2Q
+-- FIXME: The JSON5 library treats this specially, needs ext2Q
 -- import qualified Data.Map as M
 
 type T a = a -> JSValue
 
--- |Convert anything to a JSON value.
+-- |Convert anything to a JSON5 value.
 toJSON :: (Data a) => a -> JSValue
 toJSON = toJSON_generic
          `ext1Q` jList
@@ -102,36 +103,36 @@ toJSON_generic = generic
         jsObject = JSObject . toJSObject
 
 
-type F a = Result a
+type R a = Result a
 
--- |Convert a JSON value to anything (fails if the types do not match).
+-- |Convert a JSON5 value to anything (fails if the types do not match).
 fromJSON :: (Data a) => JSValue -> Result a
 fromJSON j = fromJSON_generic j
              `ext1R` jList
 
-             `extR` (value :: F Integer)
-             `extR` (value :: F Int)
-             `extR` (value :: F Word8)
-             `extR` (value :: F Word16)
-             `extR` (value :: F Word32)
-             `extR` (value :: F Word64)
-             `extR` (value :: F Int8)
-             `extR` (value :: F Int16)
-             `extR` (value :: F Int32)
-             `extR` (value :: F Int64)
-             `extR` (value :: F Double)
-             `extR` (value :: F Float)
-             `extR` (value :: F Char)
-             `extR` (value :: F String)
+             `extR` (value :: R Integer)
+             `extR` (value :: R Int)
+             `extR` (value :: R Word8)
+             `extR` (value :: R Word16)
+             `extR` (value :: R Word32)
+             `extR` (value :: R Word64)
+             `extR` (value :: R Int8)
+             `extR` (value :: R Int16)
+             `extR` (value :: R Int32)
+             `extR` (value :: R Int64)
+             `extR` (value :: R Double)
+             `extR` (value :: R Float)
+             `extR` (value :: R Char)
+             `extR` (value :: R String)
 
-             `extR` (value :: F Bool)
-             `extR` (value :: F ())
-             `extR` (value :: F Ordering)
+             `extR` (value :: R Bool)
+             `extR` (value :: R ())
+             `extR` (value :: R Ordering)
 
-             `extR` (value :: F I.IntSet)
-             `extR` (value :: F S.ByteString)
-             `extR` (value :: F L.ByteString)
-  where value :: (JSON a) => Result a
+             `extR` (value :: R I.IntSet)
+             `extR` (value :: R S.ByteString)
+             `extR` (value :: R L.ByteString)
+  where value :: (JSON5 a) => Result a
         value = readJSON j
 
         jList :: (Data e) => Result [e]
@@ -170,7 +171,7 @@ fromJSON_generic j = generic
           where f :: (Data a) => StateT [JSValue] Result a
                 f = do js <- get; case js of [] -> lift $ Error "construct: empty list"; j' : js' -> do put js'; lift $ fromJSON j'
 
-        -- Select the named fields from a JSON object.  FIXME? Should this use a map?
+        -- Select the named fields from a JSON5 object.  FIXME? Should this use a map?
         selectFields fjs = mapM sel
           where sel f = maybe (Error $ "fromJSON: field does not exist " ++ f) Ok $ lookup f fjs
 

@@ -332,6 +332,7 @@ readJSValue = do
     't' : _ -> readJSBool
     'f' : _ -> readJSBool
     (x:xs)
+      | isSpace x -> setInput xs >> readJSValue
       | isDigit x || x == '.' -> fromJSRational <$> readJSRational
       | x `elem` "NI" -> fromJSInfNaN <$> readJSInfNaN
       | x `elem` "+-" -> case xs of

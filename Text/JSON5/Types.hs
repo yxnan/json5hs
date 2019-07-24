@@ -15,8 +15,8 @@ module Text.JSON5.Types (
 
   , JSObject(..)
   , toJSObject
-  , getJSObjectField
-  , setJSObjectField
+  , get_field
+  , set_field
 
   ) where
 
@@ -61,8 +61,8 @@ newtype JSObject a = JSONObject { fromJSObject :: [(String, a)] }
 toJSObject :: [(String,a)] -> JSObject a
 toJSObject = JSONObject
 
-getJSObjectField :: JSObject a -> String -> Maybe a
-getJSObjectField (JSONObject xs) x = lookup x xs
+get_field :: JSObject a -> String -> Maybe a
+get_field (JSONObject xs) x = lookup x xs
 
-setJSObjectField :: JSObject a -> String -> a -> JSObject a
-setJSObjectField (JSONObject xs) k v = JSONObject ((k,v) : filter ((/= k) . fst) xs)
+set_field :: JSObject a -> String -> a -> JSObject a
+set_field (JSONObject xs) k v = JSONObject ((k,v) : filter ((/= k) . fst) xs)

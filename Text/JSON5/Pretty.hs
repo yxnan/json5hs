@@ -18,7 +18,6 @@ module Text.JSON5.Pretty
   ) where
 
 import Text.JSON5.Types
-import Text.JSON5.String {-debug-}
 import Text.PrettyPrint.HughesPJ
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Data.Ratio

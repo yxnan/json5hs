@@ -1,18 +1,18 @@
 {-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances #-}
--- | Serialising Haskell values to and from JSON values.
+-- | Serialising Haskell values to and from JSON5 values.
 module Text.JSON5 (
-    -- * JSON Types
+    -- * JSON5 Types
     JSValue(..)
 
     -- * Serialization to and from JSValues
-  , JSON(..)
+  , JSON5(..)
 
     -- * Encoding and Decoding
   , Result(..)
-  , encode -- :: JSON a => a -> String
-  , decode -- :: JSON a => String -> Either String a
-  , encodeStrict -- :: JSON a => a -> String
-  , decodeStrict -- :: JSON a => String -> Either String a
+  , encode -- :: JSON5 a => a -> String
+  , decode -- :: JSON5 a => String -> Either String a
+  , encodeStrict -- :: JSON5 a => a -> String
+  , decodeStrict -- :: JSON5 a => String -> Either String a
 
     -- * Wrapper Types
   , JSString
@@ -25,11 +25,11 @@ module Text.JSON5 (
   , resultToEither
 
     -- * Serialization to and from Strings.
-    -- ** Reading JSON
+    -- ** Reading JSON5
   , readJSNull, readJSBool, readJSString, readJSRational
   , readJSArray, readJSObject, readJSValue
 
-    -- ** Writing JSON
+    -- ** Writing JSON5
   , showJSNull, showJSBool, showJSArray
   , showJSRational, showJSInfNaN
   , showJSObject, showJSValue
@@ -60,31 +60,31 @@ import qualified Data.Text as T
 
 ------------------------------------------------------------------------
 
--- | Decode a String representing a JSON value
+-- | Decode a String representing a JSON5 value
 -- (either an object, array, bool, number, null)
 --
--- This is a superset of JSON, as types other than
+-- This is a superset of JSON5, as types other than
 -- Array and Object are allowed at the top level.
 --
-decode :: (JSON a) => String -> Result a
+decode :: (JSON5 a) => String -> Result a
 decode s = case runGetJSON readJSValue s of
              Right a  -> readJSON a
              Left err -> Error err
 
--- | Encode a Haskell value into a string, in JSON format.
+-- | Encode a Haskell value into a string, in JSON5 format.
 --
--- This is a superset of JSON, as types other than
+-- This is a superset of JSON5, as types other than
 -- Array and Object are allowed at the top level.
 --
-encode :: (JSON a) => a -> String
+encode :: (JSON5 a) => a -> String
 encode = (flip showJSValue [] . showJSON)
 
 ------------------------------------------------------------------------
 
 -- | Decode a String representing a strict JSON value.
 -- This follows the spec, and requires top level
--- JSON types to be an Array or Object.
-decodeStrict :: (JSON a) => String -> Result a
+-- JSON5 types to be an Array or Object.
+decodeStrict :: (JSON5 a) => String -> Result a
 decodeStrict s = case runGetJSON readJSTopType s of
      Right a  -> readJSON a
      Left err -> Error err
@@ -92,14 +92,14 @@ decodeStrict s = case runGetJSON readJSTopType s of
 -- | Encode a value as a String in strict JSON format.
 -- This follows the spec, and requires all values
 -- at the top level to be wrapped in either an Array or Object.
--- JSON types to be an Array or Object.
-encodeStrict :: (JSON a) => a -> String
+-- JSON5 types to be an Array or Object.
+encodeStrict :: (JSON5 a) => a -> String
 encodeStrict = (flip showJSTopType [] . showJSON)
 
 ------------------------------------------------------------------------
 
--- | The class of types serialisable to and from JSON
-class JSON a where
+-- | The class of types serialisable to and from JSON5
+class JSON5 a where
   readJSON  :: JSValue -> Result a
   showJSON  :: a -> JSValue
 
@@ -147,10 +147,10 @@ mkError s = Error s
 
 --------------------------------------------------------------------
 --
--- | To ensure we generate valid JSON, we map Haskell types to JSValue
+-- | To ensure we generate valid JSON5, we map Haskell types to JSValue
 -- internally, then pretty print that.
 --
-instance JSON JSValue where
+instance JSON5 JSValue where
     showJSON = id
     readJSON = return
 
@@ -158,20 +158,20 @@ second :: (a -> b) -> (x,a) -> (x,b)
 second f (a,b) = (a, f b)
 
 --------------------------------------------------------------------
--- Some simple JSON wrapper types, to avoid overlapping instances
+-- Some simple JSON5 wrapper types, to avoid overlapping instances
 
--- instance JSON JSNumber where
+-- instance JSON5 JSNumber where
 --   readJSON (JSRational r) = return r
 --   readJSON (JSInfNaN n)   = return n
 --   readJSON _              = mkError "Unable to read JSNumber"
 --   showJSON = JSNumber
 
-instance JSON JSString where
+instance JSON5 JSString where
   readJSON (JSString s) = return s
   readJSON _            = mkError "Unable to read JSString"
   showJSON = JSString
 
-instance (JSON a) => JSON (JSObject a) where
+instance (JSON5 a) => JSON5 (JSObject a) where
   readJSON (JSObject o) =
       let f (x,y) = do y' <- readJSON y; return (x,y')
       in toJSObject `fmap` mapM f (fromJSObject o)
@@ -183,12 +183,12 @@ instance (JSON a) => JSON (JSObject a) where
 -- Instances
 --
 
-instance JSON Bool where
+instance JSON5 Bool where
   showJSON = JSBool
   readJSON (JSBool b) = return b
   readJSON _          = mkError "Unable to read Bool"
 
-instance JSON Char where
+instance JSON5 Char where
   showJSON  = JSString . toJSString . (:[])
   showJSONs = JSString . toJSString
 
@@ -201,7 +201,7 @@ instance JSON Char where
   readJSONs (JSArray a)   = mapM readJSON a
   readJSONs _             = mkError "Unable to read String"
 
-instance JSON Ordering where
+instance JSON5 Ordering where
   showJSON = encJSString show
   readJSON = decJSString "Ordering" readOrd
     where
@@ -215,75 +215,75 @@ instance JSON Ordering where
 -- -----------------------------------------------------------------
 -- Integral types
 
-instance JSON Integer where
+instance JSON5 Integer where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ round i
   readJSON _ = mkError "Unable to read Integer"
 
 -- constrained:
-instance JSON Int where
+instance JSON5 Int where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ round i
   readJSON _ = mkError "Unable to read Int"
 
 -- constrained:
-instance JSON Word where
+instance JSON5 Word where
   showJSON = fromJSRational . toRational
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Word"
 
 -- -----------------------------------------------------------------
 
-instance JSON Word8 where
+instance JSON5 Word8 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Word8"
 
-instance JSON Word16 where
+instance JSON5 Word16 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Word16"
 
-instance JSON Word32 where
+instance JSON5 Word32 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Word32"
 
-instance JSON Word64 where
+instance JSON5 Word64 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Word64"
 
-instance JSON Int8 where
+instance JSON5 Int8 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Int8"
 
-instance JSON Int16 where
+instance JSON5 Int16 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Int16"
 
-instance JSON Int32 where
+instance JSON5 Int32 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Int32"
 
-instance JSON Int64 where
+instance JSON5 Int64 where
   showJSON = fromJSRational . fromIntegral
   readJSON (JSNumber (JSRational i)) = return $ truncate i
   readJSON _ = mkError "Unable to read Int64"
 
 -- -----------------------------------------------------------------
 
-instance JSON Double where
+instance JSON5 Double where
   showJSON = fromJSRational . toRational
   readJSON (JSNumber (JSRational r)) = return $ fromRational r
   readJSON _ = mkError "Unable to read Double"
     -- can't use JSRational here, due to ambiguous '0' parse
     -- it will parse as Integer.
 
-instance JSON Float where
+instance JSON5 Float where
   showJSON = fromJSRational . toRational
   readJSON (JSNumber (JSRational r)) = return $ fromRational r
   readJSON (JSNumber (JSInfNaN n))   = return n
@@ -292,7 +292,7 @@ instance JSON Float where
 -- -----------------------------------------------------------------
 -- Sums
 
-instance (JSON a) => JSON (Maybe a) where
+instance (JSON5 a) => JSON5 (Maybe a) where
   readJSON (JSObject o) = case "Just" `lookup` as of
       Just x -> Just <$> readJSON x
       _      -> case ("Nothing" `lookup` as) of
@@ -303,7 +303,7 @@ instance (JSON a) => JSON (Maybe a) where
   showJSON (Just x) = JSObject $ toJSObject [("Just", showJSON x)]
   showJSON Nothing  = JSObject $ toJSObject [("Nothing", JSNull)]
 
-instance (JSON a, JSON b) => JSON (Either a b) where
+instance (JSON5 a, JSON5 b) => JSON5 (Either a b) where
   readJSON (JSObject o) = case "Left" `lookup` as of
       Just a  -> Left <$> readJSON a
       Nothing -> case "Right" `lookup` as of
@@ -317,17 +317,17 @@ instance (JSON a, JSON b) => JSON (Either a b) where
 -- -----------------------------------------------------------------
 -- Products
 
-instance JSON () where
+instance JSON5 () where
   showJSON _ = JSArray []
   readJSON (JSArray []) = return ()
   readJSON _      = mkError "Unable to read ()"
 
-instance (JSON a, JSON b) => JSON (a,b) where
+instance (JSON5 a, JSON5 b) => JSON5 (a,b) where
   showJSON (a,b) = JSArray [ showJSON a, showJSON b ]
   readJSON (JSArray [a,b]) = (,) `fmap` readJSON a `ap` readJSON b
   readJSON _ = mkError "Unable to read Pair"
 
-instance (JSON a, JSON b, JSON c) => JSON (a,b,c) where
+instance (JSON5 a, JSON5 b, JSON5 c) => JSON5 (a,b,c) where
   showJSON (a,b,c) = JSArray [ showJSON a, showJSON b, showJSON c ]
   readJSON (JSArray [a,b,c]) = (,,) `fmap`
                                   readJSON a `ap`
@@ -335,7 +335,7 @@ instance (JSON a, JSON b, JSON c) => JSON (a,b,c) where
                                   readJSON c
   readJSON _ = mkError "Unable to read Triple"
 
-instance (JSON a, JSON b, JSON c, JSON d) => JSON (a,b,c,d) where
+instance (JSON5 a, JSON5 b, JSON5 c, JSON5 d) => JSON5 (a,b,c,d) where
   showJSON (a,b,c,d) = JSArray [showJSON a, showJSON b, showJSON c, showJSON d]
   readJSON (JSArray [a,b,c,d]) = (,,,) `fmap`
                                   readJSON a `ap`
@@ -349,42 +349,42 @@ instance (JSON a, JSON b, JSON c, JSON d) => JSON (a,b,c,d) where
 -- List-like types
 
 
-instance JSON a => JSON [a] where
+instance JSON5 a => JSON5 [a] where
   showJSON = showJSONs
   readJSON = readJSONs
 
 -- container types:
 
 #if !defined(MAP_AS_DICT)
-instance (Ord a, JSON a, JSON b) => JSON (M.Map a b) where
+instance (Ord a, JSON5 a, JSON5 b) => JSON5 (M.Map a b) where
   showJSON = encJSArray M.toList
   readJSON = decJSArray "Map" M.fromList
 
-instance (JSON a) => JSON (IntMap.IntMap a) where
+instance (JSON5 a) => JSON5 (IntMap.IntMap a) where
   showJSON = encJSArray IntMap.toList
   readJSON = decJSArray "IntMap" IntMap.fromList
 
 #else
-instance (Ord a, JSKey a, JSON b) => JSON (M.Map a b) where
+instance (Ord a, JSKey a, JSON5 b) => JSON5 (M.Map a b) where
   showJSON    = encJSDict . M.toList
   readJSON o  = M.fromList <$> decJSDict "Map" o
 
-instance (JSON a) => JSON (IntMap.IntMap a) where
+instance (JSON5 a) => JSON5 (IntMap.IntMap a) where
   {- alternate (dict) mapping: -}
   showJSON    = encJSDict . IntMap.toList
   readJSON o  = IntMap.fromList <$> decJSDict "IntMap" o
 #endif
 
 
-instance (Ord a, JSON a) => JSON (Set.Set a) where
+instance (Ord a, JSON5 a) => JSON5 (Set.Set a) where
   showJSON = encJSArray Set.toList
   readJSON = decJSArray "Set" Set.fromList
 
-instance (Array.Ix i, JSON i, JSON e) => JSON (Array.Array i e) where
+instance (Array.Ix i, JSON5 i, JSON5 e) => JSON5 (Array.Array i e) where
   showJSON = encJSArray Array.assocs
   readJSON = decJSArray "Array" arrayFromList
 
-instance JSON I.IntSet where
+instance JSON5 I.IntSet where
   showJSON = encJSArray I.toList
   readJSON = decJSArray "IntSet" I.fromList
 
@@ -404,18 +404,18 @@ arrayFromList ls@((i,_):xs) = Array.array bnds ls
 -- -----------------------------------------------------------------
 -- ByteStrings
 
-instance JSON S.ByteString where
+instance JSON5 S.ByteString where
   showJSON = encJSString S.unpack
   readJSON = decJSString "ByteString" (return . S.pack)
 
-instance JSON L.ByteString where
+instance JSON5 L.ByteString where
   showJSON = encJSString L.unpack
   readJSON = decJSString "Lazy.ByteString" (return . L.pack)
 
 -- -----------------------------------------------------------------
 -- Data.Text
 
-instance JSON T.Text where
+instance JSON5 T.Text where
   readJSON (JSString s) = return (T.pack . fromJSString $ s)
   readJSON _            = mkError "Unable to read JSString"
   showJSON              = JSString . toJSString . T.unpack
@@ -427,8 +427,8 @@ instance JSON T.Text where
 makeObj :: [(String, JSValue)] -> JSValue
 makeObj = JSObject . toJSObject
 
--- | Pull a value out of a JSON object.
-valFromObj :: JSON a => String -> JSObject JSValue -> Result a
+-- | Pull a value out of a JSON5 object.
+valFromObj :: JSON5 a => String -> JSObject JSValue -> Result a
 valFromObj k o = maybe (Error $ "valFromObj: Could not find key: " ++ show k)
                        readJSON
                        (lookup k (fromJSObject o))
@@ -440,14 +440,14 @@ decJSString :: String -> (String -> Result a) -> JSValue -> Result a
 decJSString _ f (JSString s) = f (fromJSString s)
 decJSString l _ _ = mkError ("readJSON{"++l++"}: unable to parse string value")
 
-encJSArray :: (JSON a) => (b-> [a]) -> b -> JSValue
+encJSArray :: (JSON5 a) => (b -> [a]) -> b -> JSValue
 encJSArray f v = showJSON (f v)
 
-decJSArray :: (JSON a) => String -> ([a] -> b) -> JSValue -> Result b
+decJSArray :: (JSON5 a) => String -> ([a] -> b) -> JSValue -> Result b
 decJSArray _ f a@JSArray{} = f <$> readJSON a
 decJSArray l _ _ = mkError ("readJSON{"++l++"}: unable to parse array value")
 
--- | Haskell types that can be used as keys in JSON objects.
+-- | Haskell types that can be used as keys in JSON5 objects.
 class JSKey a where
   toJSKey   :: a -> String
   fromJSKey :: String -> Maybe a
@@ -469,11 +469,11 @@ instance JSKey String where
   fromJSKey = Just
 
 -- | Encode an association list as 'JSObject' value.
-encJSDict :: (JSKey a, JSON b) => [(a,b)] -> JSValue
+encJSDict :: (JSKey a, JSON5 b) => [(a,b)] -> JSValue
 encJSDict v = makeObj [ (toJSKey x, showJSON y) | (x,y) <- v ]
 
 -- | Decode a 'JSObject' value into an association list.
-decJSDict :: (JSKey a, JSON b)
+decJSDict :: (JSKey a, JSON5 b)
           => String
           -> JSValue
           -> Result [(a,b)]
@@ -483,6 +483,6 @@ decJSDict l (JSObject o) = mapM rd (fromJSObject o)
                      Nothing -> mkError ("readJSON{" ++ l ++ "}:" ++
                                     "unable to read dict; invalid object key")
 
-decJSDict l _ = mkError ("readJSON{"++l ++ "}: unable to read dict; expected JSON object")
+decJSDict l _ = mkError ("readJSON{"++ l ++ "}: unable to read dict; expected JSON5 object")
 
 
