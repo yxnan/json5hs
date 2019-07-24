@@ -24,6 +24,7 @@ module Text.JSON5.String
      , showJSArray
      , showJSObject
      , showJSRational
+     , showJSInfNaN
 
      , showJSValue
      , showJSTopType

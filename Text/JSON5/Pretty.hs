@@ -77,7 +77,7 @@ ppObject xs = braces $ fsep $ punctuate comma $ map pp_field xs
   where pp_field (k,v) = ppString k PP.<> colon <+> ppJSValue v
 
 ppJSString :: JSString -> Doc
-ppJSString x = ppString (fromJSString x)
+ppJSString = ppString . fromJSString
 
 ppJSObject :: JSObject JSValue -> Doc
-ppJSObject x = ppObject (fromJSObject x)
+ppJSObject = ppObject . fromJSObject

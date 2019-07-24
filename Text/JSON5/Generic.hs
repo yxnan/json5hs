@@ -1,7 +1,7 @@
 {-# LANGUAGE PatternGuards #-}
 -- | JSON serializer and deserializer using Data.Generics.
 -- The functions here handle algebraic data types and primitive types.
--- It uses the same representation as "Text.JSON" for "Prelude" types.
+-- It uses the same representation as "Text.JSON5" for "Prelude" types.
 module Text.JSON5.Generic
     ( module Text.JSON5
     , Data
@@ -16,8 +16,9 @@ module Text.JSON5.Generic
     ) where
 
 import Control.Monad.State
-import Text.JSON5
-import Text.JSON5.String ( runGetJSON )
+import Text.JSON5.Types
+import Text.JSON5 (JSON(..), Result(..))
+import Text.JSON5.String (runGetJSON, readJSValue, showJSValue)
 import Data.Generics
 import Data.Word
 import Data.Int

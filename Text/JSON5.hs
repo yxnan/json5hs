@@ -31,7 +31,7 @@ module Text.JSON5 (
 
     -- ** Writing JSON
   , showJSNull, showJSBool, showJSArray
-  , showJSRational, showJSRational'
+  , showJSRational, showJSInfNaN
   , showJSObject, showJSValue
 
     -- ** Instance helpers
@@ -45,7 +45,7 @@ import Text.JSON5.String
 
 import Data.Int
 import Data.Word
-import Control.Monad(liftM,ap,MonadPlus(..))
+import Control.Monad(liftM, ap, MonadPlus(..))
 import Control.Applicative
 
 import qualified Data.ByteString.Char8 as S
@@ -119,7 +119,8 @@ resultToEither :: Result a -> Either String a
 resultToEither (Ok a)    = Right a
 resultToEither (Error s) = Left  s
 
-instance Functor Result where fmap = liftM
+instance Functor Result where
+  fmap = liftM
 
 instance Applicative Result where
   (<*>) = ap
@@ -141,7 +142,6 @@ instance Monad Result where
   Ok a >>= f    = f a
   Error x >>= _ = Error x
 
--- | Convenient error generation
 mkError :: String -> Result a
 mkError s = Error s
 
@@ -159,6 +159,12 @@ second f (a,b) = (a, f b)
 
 --------------------------------------------------------------------
 -- Some simple JSON wrapper types, to avoid overlapping instances
+
+-- instance JSON JSNumber where
+--   readJSON (JSRational r) = return r
+--   readJSON (JSInfNaN n)   = return n
+--   readJSON _              = mkError "Unable to read JSNumber"
+--   showJSON = JSNumber
 
 instance JSON JSString where
   readJSON (JSString s) = return s
@@ -210,77 +216,78 @@ instance JSON Ordering where
 -- Integral types
 
 instance JSON Integer where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ round i
-  readJSON _             = mkError "Unable to read Integer"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ round i
+  readJSON _ = mkError "Unable to read Integer"
 
 -- constrained:
 instance JSON Int where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ round i
-  readJSON _              = mkError "Unable to read Int"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ round i
+  readJSON _ = mkError "Unable to read Int"
 
 -- constrained:
 instance JSON Word where
-  showJSON = JSRational False . toRational
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Word"
+  showJSON = fromJSRational . toRational
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Word"
 
 -- -----------------------------------------------------------------
 
 instance JSON Word8 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Word8"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Word8"
 
 instance JSON Word16 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Word16"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Word16"
 
 instance JSON Word32 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Word32"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Word32"
 
 instance JSON Word64 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Word64"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Word64"
 
 instance JSON Int8 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Int8"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Int8"
 
 instance JSON Int16 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Int16"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Int16"
 
 instance JSON Int32 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _             = mkError "Unable to read Int32"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Int32"
 
 instance JSON Int64 where
-  showJSON = JSRational False . fromIntegral
-  readJSON (JSRational _ i) = return $ truncate i
-  readJSON _                = mkError "Unable to read Int64"
+  showJSON = fromJSRational . fromIntegral
+  readJSON (JSNumber (JSRational i)) = return $ truncate i
+  readJSON _ = mkError "Unable to read Int64"
 
 -- -----------------------------------------------------------------
 
 instance JSON Double where
-  showJSON = JSRational False . toRational
-  readJSON (JSRational _ r) = return $ fromRational r
-  readJSON _                = mkError "Unable to read Double"
+  showJSON = fromJSRational . toRational
+  readJSON (JSNumber (JSRational r)) = return $ fromRational r
+  readJSON _ = mkError "Unable to read Double"
     -- can't use JSRational here, due to ambiguous '0' parse
     -- it will parse as Integer.
 
 instance JSON Float where
-  showJSON = JSRational True . toRational
-  readJSON (JSRational _ r) = return $ fromRational r
-  readJSON _                = mkError "Unable to read Float"
+  showJSON = fromJSRational . toRational
+  readJSON (JSNumber (JSRational r)) = return $ fromRational r
+  readJSON (JSNumber (JSInfNaN n))   = return n
+  readJSON _ = mkError "Unable to read Float"
 
 -- -----------------------------------------------------------------
 -- Sums
