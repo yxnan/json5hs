@@ -238,6 +238,12 @@ readJSInfNaN = do
        'N':'a':'N':ds -> setInput ds >> return (acos 2)
        _ -> fail $ "Unable to parse JSON5 InfNaN: " ++ context cs
 
+-- | Objects & Arrays
+
+-- Object keys may be an ECMAScript 5.1 IdentifierName.
+-- Objects may have a single trailing comma.
+-- Arrays may have a single trailing comma.
+
 -- | Read a list in JSON5 format
 readJSArray  :: GetJSON JSValue
 readJSArray  = readSequence '[' ']' ',' >>= return . JSArray
@@ -296,10 +302,12 @@ readAssocs start end sep = do
 
           ds <- getInput
           case dropWhile isSpace ds of
-            e : es | e == sep -> do setInput (dropWhile isSpace es)
-                                    parsePairs (a:rs)
-                   | e == end -> do setInput (dropWhile isSpace es)
-                                    return (reverse (a:rs))
+            e : es
+              | e == sep -> case dropWhile isSpace es of
+                              '}':cs -> setInput cs >> return (reverse (a:rs))
+                              cs     -> setInput cs >> parsePairs (a:rs)
+              | e == end -> do setInput (dropWhile isSpace es)
+                               return (reverse (a:rs))
             _ -> fail $ "Unable to parse JSON5 object: unterminated sequence: "
                             ++ context ds
 
