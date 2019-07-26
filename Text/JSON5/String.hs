@@ -178,7 +178,7 @@ readJSRational = do
    pos [] = fail $ "Unable to parse JSON5 Rational: " ++ context []
    pos cs =
      case cs of
-       '0':'.':ds -> frac 0 cs
+       '.':ds -> frac 0 cs
        '0':'x':ds -> hex ds
        c  : ds
         | isDigit c -> readDigits (digitToIntI c) ds
