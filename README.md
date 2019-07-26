@@ -14,18 +14,24 @@ between Haskell values and JSON5.
 ## Example
 
 ```haskell
-ghci> import qualified Text.JSON5 as J
-ghci> J.encode [("key1",1),("key2",2)]
+ghci> import Text.JSON5
+ghci> encode [("key1",1),("key2",2)]
 "[[\"key1\",1],[\"key2\",2]]"
 
 ghci> import Text.JSON5.String (runGetJSON)
 ghci> input <- getLine 
 {'singleQuotes': 0xabcde, pos: +3, infnan: +Infinity, escape: "\t\u1234", trailing-comma: ['here',], }
-ghci> runGetJSON J.readJSValue input
+ghci> runGetJSON readJSValue input
 Right (JSObject (JSONObject {fromJSObject = [("singleQuotes",JSNumber (JSRational (703710 % 1))),("pos",JSNumber (JSRational (3 % 1))),("infnan",JSNumber (JSInfNaN Infinity)),("escape",JSString (JSONString {fromJSString = "\t\4660"})),("trailing-comma",JSArray [JSString (JSONString {fromJSString = "here"})])]}))
 
-ghci> ppJSValue (JSObject (JSONObject [("key1",JSString (JSONString "string")),("key2",JSNumber (JSRational 42)),("key3",JSArray [JSBool True,JSNull])]))
-{"key1": "string", "key2": 42, "key3": [true, null]}
+ghci> import Text.JSON5.Pretty
+ghci> ppJSValue $ makeObj [("key1", JSString $ toJSString "value1"), ("key2", JSArray [JSNull, JSBool True])]
+{"key1": "value1", "key2": [null, true]}
 
+ghci> import Text.JSON5.Generic
+ghci> ppJSValue $ toJSON $ Just [2,1,4]
+{"Just": [2, 1, 4]}
+ghci> fromJSON (JSString $ toJSString "string") :: Result String 
+Ok "string"
 ```
 

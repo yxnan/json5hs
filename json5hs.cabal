@@ -1,5 +1,5 @@
 name:               json5hs
-version:            0.1.2
+version:            0.1.2.2
 synopsis:           Serialising to and from JSON5
 description:
     The JSON5 Data Interchange Format (JSON5) is a superset of JSON
