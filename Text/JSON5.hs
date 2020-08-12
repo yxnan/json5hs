@@ -138,9 +138,11 @@ instance MonadPlus Result where
 
 instance Monad Result where
   return x      = Ok x
-  fail x        = Error x
   Ok a >>= f    = f a
   Error x >>= _ = Error x
+
+instance MonadFail Result where
+  fail x        = Error x
 
 mkError :: String -> Result a
 mkError s = Error s
