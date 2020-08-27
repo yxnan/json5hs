@@ -57,10 +57,12 @@ instance A.Applicative GetJSON where
 
 instance Monad GetJSON where
   return x        = GetJSON (\s -> Right (x,s))
-  fail x          = GetJSON (\_ -> Left x)
   GetJSON m >>= f = GetJSON (\s -> case m s of
                                      Left err -> Left err
                                      Right (a,s1) -> un (f a) s1)
+
+instance MonadFail GetJSON where
+  fail x          = GetJSON (\_ -> Left x)
 
 -- | Run a JSON5 reader on an input String, returning some Haskell value.
 -- All input will be consumed.
