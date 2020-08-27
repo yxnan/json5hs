@@ -1,5 +1,5 @@
 name:               json5hs
-version:            0.1.2.3
+version:            0.1.2.2
 synopsis:           Serialising to and from JSON5
 description:
     The JSON5 Data Interchange Format (JSON5) is a superset of JSON
@@ -12,14 +12,14 @@ category:           Web, Text, JSON5
 license:            BSD3
 license-file:       LICENSE
 author:             Yang X. Nan
-maintainer:         yxnan@pm.me
+maintainer:         sakamitz@yahoo.co.jp
 Copyright:          2019 Yang X. Nan
 cabal-version:      >= 1.6
 build-type: Simple
 
 source-repository head
     type:     git
-    location: https://github.com/typowritter/json5hs.git
+    location: https://github.com/sakamitz/json5hs.git
 
 flag split-base
   default: True
