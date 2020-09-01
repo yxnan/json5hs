@@ -136,6 +136,7 @@ instance MonadPlus Result where
   _ `mplus` x    = x
   mzero          = Error "Result: MonadPlus.empty"
 
+#if __GLASGOW_HASKELL__ >= 808
 instance Monad Result where
   return x      = Ok x
   Ok a >>= f    = f a
@@ -143,6 +144,14 @@ instance Monad Result where
 
 instance MonadFail Result where
   fail x        = Error x
+
+#else
+instance Monad Result where
+  return x      = Ok x
+  fail x        = Error x
+  Ok a >>= f    = f a
+  Error x >>= _ = Error x
+#endif
 
 mkError :: String -> Result a
 mkError s = Error s

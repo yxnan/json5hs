@@ -1,5 +1,5 @@
+{-# LANGUAGE CPP #-}
 -- | Basic support for working with JSON5 values.
-
 module Text.JSON5.String
      (
        -- * Parsing
@@ -55,6 +55,7 @@ instance A.Applicative GetJSON where
   pure  = return
   (<*>) = ap
 
+#if __GLASGOW_HASKELL__ >= 808
 instance Monad GetJSON where
   return x        = GetJSON (\s -> Right (x,s))
   GetJSON m >>= f = GetJSON (\s -> case m s of
@@ -63,6 +64,15 @@ instance Monad GetJSON where
 
 instance MonadFail GetJSON where
   fail x          = GetJSON (\_ -> Left x)
+
+#else
+instance Monad GetJSON where
+  return x        = GetJSON (\s -> Right (x,s))
+  fail x          = GetJSON (\_ -> Left x)
+  GetJSON m >>= f = GetJSON (\s -> case m s of
+                                     Left err -> Left err
+                                     Right (a,s1) -> un (f a) s1)
+#endif
 
 -- | Run a JSON5 reader on an input String, returning some Haskell value.
 -- All input will be consumed.

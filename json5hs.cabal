@@ -1,5 +1,5 @@
 name:               json5hs
-version:            0.1.2.2
+version:            0.1.3.1
 synopsis:           Serialising to and from JSON5
 description:
     The JSON5 Data Interchange Format (JSON5) is a superset of JSON
@@ -12,14 +12,14 @@ category:           Web, Text, JSON5
 license:            BSD3
 license-file:       LICENSE
 author:             Yang X. Nan
-maintainer:         sakamitz@yahoo.co.jp
+maintainer:         yxnan@pm.me
 Copyright:          2019 Yang X. Nan
-cabal-version:      >= 1.6
+cabal-version:      >= 1.10
 build-type: Simple
 
 source-repository head
     type:     git
-    location: https://github.com/sakamitz/json5hs.git
+    location: https://github.com/typowritter/json5hs.git
 
 flag split-base
   default: True
@@ -40,6 +40,7 @@ library
                    Text.JSON5.Types,
                    Text.JSON5.String
   ghc-options:     -Wall -O2
+  default-language:    Haskell2010
 
   if flag(split-base)
     if flag(generic)
